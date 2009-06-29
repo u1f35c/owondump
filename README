@@ -1,0 +1,172 @@
+
+About   
+========
+
+	Owondump is a userspace USB driver that interrogates an Owon PDS digital oscilloscope
+	over the USB bus, and retrieves a trace memory for all selected channels. The downloaded
+	data is made available on the PC in both vectorgram format and in the bitmap BMP format.
+
+	Owondump was originally designed for the 25MHz PDS5022s "Academic" Scope from Owon, but
+	it probably works for other scopes in the same range. 
+	
+	Owondump was originally intended for *nix machines since the manufacturer only provides
+	a closed-source binary for Microsoft Windows and, worse, that binary won't even run in
+	WINE. However, it should also be possible to build Owondump against libusb-win32, the
+	Windows port of the library.   
+	
+	Once the channel vectorgram data has been retrieved from the scope, it is parsed into a
+	tabulated text file format that can be displayed using GNUplot or similar plotting packages.
+
+
+Author
+======
+
+	Owondump was written by Michael Murphy and is released to the public under the terms of
+	the GNU GPL, or General Public License. 	
+	
+	Copyright June 2009, Michael Murphy <ee07m060@elec.qmul.ac.uk>
+
+
+Licence
+=======
+
+	Owondump is free software: you can redistribute it and/or modify it under the terms of
+	the latest GNU General Public License as published by the Free Software Foundation.
+
+	This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+	See the GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License along with this program.
+	If not, see <http://www.gnu.org/licenses/>.
+
+Requires
+========
+
+	gcc
+	GNU make
+	libusb-0.1 - http://libusb.wiki.sourceforge.net/
+	
+Compiling
+=========
+
+	gcc -lusb -o owondump owondump.c
+		
+Running
+=======
+
+	[michael@epox owondump]$ ./owondump test.bin
+
+	..Initialising libUSB
+	..Searching USB buses for Owon
+	..Found an Owon device 5345:1234 on bus 001
+	..Resetting device.
+	..Attempting USB lock on device  5345:1234
+	..Trying to claim interface 0 of 5345:1234
+	..Successfully claimed interface 0 to 5345:1234
+	..Attempting to get the Device Descriptor
+	..Successfully obtained device descriptor!
+	..Attempting to bulk write START command to device...
+	..Successful bulk write of 0005 bytes!
+	..Attempting to bulk read 000c (12) bytes from device...
+	..Successful bulk read of 000c (12) bytes! :
+	..Attempting to malloc read buffer space of 00004e90h (20112) bytes
+	..Successful malloc!
+	..Owon ready to bulk transfer 00004e90h (20112) bytes
+	..Attempting to bulk read 00004e90h (20112) bytes from device...
+	..Successful bulk read of 00004e90h (20112) bytes! :
+	..Found vector gram data
+	-------------------------------
+		      Channel: CH1
+     	         sample count: 5024
+ 	 vertical sensitivity: 20mV
+              	     timebase: 10ms
+	-------------------------------
+	              Channel: CHA
+    	         sample count: 5024
+ 	 vertical sensitivity: 10mV
+                     timebase: 10ms
+	-------------------------------
+	..Successfully opened text file 'test.bin.txt'!
+	..Successfully closed text file 'test.bin.txt'!
+	..Successfully opened file 'test.bin'!
+	..Successfully written 20112 bytes to file test.bin
+	..Attempting to release interface 0
+	..Successful release of interface 0!
+
+	[michael@epox owondump]$ cat test.bin.txt                                 		
+		
+	# Units:(mV)
+	#                 CH1             CHA
+	0                26.0             0.0
+	1                26.0             1.0
+	2                25.0             0.0
+	3                25.0             0.0
+	4                26.0             0.0
+	5                26.0             0.0
+	6                26.0             0.0
+	7                26.0             0.0
+	8                25.0             0.0
+	9                26.0             0.0
+	10               25.0             0.0
+	11               26.0             0.0
+	12               26.0             0.0
+	13               26.0             0.0
+	14               26.0            -1.0
+	15               26.0            -1.0
+	16               27.0            -1.0
+	17               26.0            -1.0
+	18               26.0            -1.0
+	19               26.0            -1.0
+	20               26.0            -2.0
+	21               26.0            -1.0
+	22               27.0            -1.0
+	23               26.0            -1.0
+	24               26.0            -2.0
+	25               26.0            -2.0
+	26               28.0            -2.0
+	27               26.0            -2.0
+	28               26.0            -2.0
+	29               27.0            -2.0
+	30               27.0            -2.0
+	31               27.0            -2.0
+	32               26.0            -3.0
+	33               27.0            -3.0
+	34               26.0            -3.0
+	35               26.0            -3.0
+	36               27.0            -4.0
+	37               26.0            -4.0
+	38               27.0            -4.0
+	39               27.0            -4.0
+	40               28.0            -4.0
+	41               27.0            -4.0
+	42               27.0            -4.0
+	43               26.0            -4.0
+	44               27.0            -4.0
+	45               27.0            -5.0
+	46               26.0            -5.0
+	[..]
+
+	[michael@epox owondump]$ gnuplot test.bin.txt                                 		
+
+	gnuplot> [0:4995] 'test.bin.txt' u ($2*0.5) s b w l lw 5 t 'CH1 20mV 10ms', 'test.bin.txt' u 3 s b w l lw 5 t 'CHA 10mV 10ms'
+
+	
+Concluding Notes	
+================
+
+	The human-readable vectorgram file format produced by Owondump exactly mirrors the format produced by the
+	original Windows s/w from Owon / Lilliput Technologies.   This format works fine when the scope channels
+	are all configured to use the same timebase. However when channel #1 is set to 5nS and channel #2 is set
+	to 100mS, for example, the tabulated sample data cannot be plotted sensibly.
+	
+	Ideally, the tabulated data should have a text header that details the timebase settings for each of the
+	channels. This header would then be parsed by the trace plotting package.
+
+	The Owon seems a bit quirky. If the device is not reset before a transfer is made, the data toggle for
+	the BULK IN endpoint gets stuck, and cannot be shifted. Without that reset, the BULK IN transfers would
+	otherwise timeout. 
+
+	All comments welcomed!
+	
+	Michael Murphy - <ee07m060@elec.qmul.ac.uk> - June 2009
