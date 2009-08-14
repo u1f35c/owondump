@@ -1,12 +1,10 @@
 /*
- * owondump.c   A userspace USB driver that interrogates an Owon PDS digital oscilloscope
- * 				and gets it to dump its trace memory for all channels, in both vectorgram
- * 				format, and/or in .BMP bitmap format.
+ * owonfileread.c
+ *				Read a binary (vectorgram) dump of the trace memory of an Owon scope from
+ *				a local file. The vectorgram is parsed into a tabulated text format that
+ *				can be plotted using GNUplot or a similar package.
  *
- * 				The vectorgram is also parsed into a tabulated text format that can be
- * 				plotted using GNUplot or a similar package.
- *
- * 				Copyright June 2009, Michael Murphy <ee07m060@elec.qmul.ac.uk>
+ * 				Copyright Aug 2009, Michael Murphy <ee07m060@elec.qmul.ac.uk>
 */
 
 #include <stdio.h>
@@ -16,6 +14,9 @@
 #include <string.h>
 #include <asm/errno.h>
 #include <arpa/inet.h> // for htonl() macro
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "owondump.h"
 
 int debug = 0;							  // set to 1 for channel data hex dumps
@@ -58,12 +59,12 @@ int decodeVertSensCode(long int i) {
 	return vertSensitivity;
 }
 
+
 long long int decodeTimebase(long int i) {
 	long long int timebase=-1;
 // c is the one byte timebase code
 	char c = (char) i;
 // return an LL int
-
 	switch (c) {
 		  case 0x00	: timebase = 5LL;	// in nanoseconds
 					  break;
@@ -129,12 +130,14 @@ long long int decodeTimebase(long int i) {
 					  break;
 		  case 0x1f	: timebase = 100000000000LL;	// 100 seconds
 					  break;
+		  default	: printf("..Unknown timebase code of %02x\n", c);
 	}
+//	printf("decodetimebase passed %02x and returned %Ld\n", c, timebase);
 	return timebase;
 }
 
 // decode the contents of the vectorgram data header - providing us with the timebase and voltage values for the channel data
-// hdrBuf has already been stripped of the 10 byte vectorgram file header that begins "SPBV......"
+// hdrBuf has already been stripped of the 10 byte vectorgram file header that begins "SPB......"
 // returns the size of the channel data block in bytes
 
 struct channelHeader decodeVectorgramBufferHeader(char *hdrBuf) {
@@ -156,13 +159,12 @@ struct channelHeader decodeVectorgramBufferHeader(char *hdrBuf) {
 	memcpy(&header.unknown8, hdrBuf+43,4);
 	memcpy(&header.unknown9, hdrBuf+43,4);
 
-
 	header.vertSensitivity = decodeVertSensCode(header.vertsenscode);	// 5mV through 5000mV (5V)
 	header.timeBase = decodeTimebase(header.timebasecode);		    	// in nanoseconds (10E-9)
 
 	printf("-------------------------------\n");
 	printf("              Channel: %s\n", header.channelname);
-	printf("         sample count: %d\n",  (int) header.samplecount1);
+	printf("         sample count: %d\n", (int) header.samplecount1);
 	printf(" vertical sensitivity: %dmV\n", header.vertSensitivity);
 	printf("             timebase: %gms\n", (double) header.timeBase / 1000000);
 	printf("-------------------------------\n");
@@ -185,58 +187,6 @@ if(debug) {
 }
 	return header;
 }
-
-// add the device locks to an array.
-void found_usb_lock(struct usb_device *dev) {
-  if(locksFound < MAX_USB_LOCKS) {
-    usb_locks[locksFound++] = dev;
-  }
-}
-
-struct usb_device *devfindOwon() {
-
-	  struct usb_bus *bus;
-	  struct usb_dev_handle *dh;
-	  int buses = 0;
-	  int devs = 0;
-
-	  buses = usb_find_busses();
-	  devs = usb_find_devices();
-
-	  for (bus = usb_busses; bus; bus = bus->next) {
-		struct usb_device *dev;
-	    for (dev = bus->devices; dev; dev = dev->next)
-	      if(dev->descriptor.idVendor == USB_LOCK_VENDOR && dev->descriptor.idProduct == USB_LOCK_PRODUCT) {
-	        found_usb_lock(dev);
-	        printf("..Found an Owon device %04x:%04x on bus %s\n", USB_LOCK_VENDOR,USB_LOCK_PRODUCT, bus->dirname);
-	    	printf("..Resetting device.\n");
-	    	dh=usb_open(dev);
-			usb_reset(dh);	// quirky.. device has to be initially reset
-	    	return(dev);	// return the device
-	      }
-	  }
-	  return (NULL);		// No Owon found
-}
-
-void writeRawData(char *buf, int count) {
-	FILE *fp;
-
-	if ((fp=fopen(filename,"w")) == NULL) {
-	  printf("..Failed to open file \'%s\'!\n", filename);
-	  return;
-	}
-	else
-      printf("..Successfully opened file \'%s\'!\n", filename);
-
-	if (fwrite(buf,sizeof(unsigned char), count, fp) != count)
-	  printf("..Failed to write %d bytes to file %s\n", count, filename);
-	else
-	  printf("..Successfully written %d bytes to file %s\n", count, filename);
-
-	fclose(fp);
-	return;
-}
-
 
 void writeTextData(char *buf, int count) {
 	FILE *fpout;
@@ -272,6 +222,14 @@ void writeTextData(char *buf, int count) {
 		fprintf(fpout, "\t\t  %s", headers[i].channelname);
 	fprintf(fpout,"\n");
 
+// for the sake of pointer sanity, we must check the sample count of every channel..
+// before trying to print a sample for channel 'n' for every timeslot up to the sample count of channel 1
+//
+// Even so, this is less than ideal where the timebases for each channel are different... it means
+// the plots produced from the data tables are basically meaningless - but that's the way Owon have done it..
+//
+// see the README in the tarball for perhaps how the text data file should be written.
+
 	for(j=0;j < (int) headers[0].samplecount1;j++) {
 		fprintf(fpout, "%d", j+1);
 		for(i = 0 ;i < channelcount;i++) {
@@ -288,135 +246,42 @@ void writeTextData(char *buf, int count) {
 		printf("..Successfully closed text file \'%s\'!\n", txtfilename);
 }
 
-void readOwonMemory(struct usb_device *dev) {
+void readOwonBinFile(FILE *fp) {
 
-	usb_dev_handle *devHandle = 0;
-
-	signed int ret=0;	// set to < 0 to indicate USB errors
-	int i=0, j=0;
-
-	unsigned int owonDataBufferSize=0;
-	char owonCmdBuffer[0x0c];
-	char owonDescriptorBuffer[0x12];
+	int i, j, ret;
+	int owonFileSize=0;
 	char *owonDataBuffer;	 				 // malloc-ed at runtime
 	char *headerptr;						 // used to reference the start of the header
+	int fd;
+	struct stat buf;
 
-	if(dev->descriptor.idVendor != USB_LOCK_VENDOR || dev->descriptor.idProduct != USB_LOCK_PRODUCT) {
-	  printf("..Failed device lock attempt: not passed a USB device handle!\n");
-	  return;
-	}
-	printf("..Attempting USB lock on device  %04x:%04x\n",
-			dev->descriptor.idVendor, dev->descriptor.idProduct);
+	fd = fileno(fp);
+	fstat(fd, &buf);
 
-	devHandle = usb_open(dev);
+	owonFileSize = buf.st_size;
 
-	if(devHandle > 0) {
-	  printf("..Trying to claim interface 0 of %04x:%04x \n",
-			dev->descriptor.idVendor, dev->descriptor.idProduct);
-
-	  ret = usb_set_configuration(devHandle, DEFAULT_CONFIGURATION);
-	  ret = usb_claim_interface(devHandle, DEFAULT_INTERFACE); // interface 0
-
-	  ret = usb_clear_halt(devHandle, BULK_READ_ENDPOINT);
-//	  ret = usb_set_altinterface(devHandle, DEFAULT_INTERFACE);
-
-	  if(ret) {
-        printf("..Failed to claim interface %d: %d : \'%s\'\n", DEFAULT_INTERFACE, ret, strerror(-ret));
-	    goto bail;
-      }
-	}
-	else {
-	  printf("..Failed to open device..\'%s\'", strerror(-ret));
-	  goto bail;
-	}
-
-	printf("..Successfully claimed interface 0 to %04x:%04x \n",
-			dev->descriptor.idVendor, dev->descriptor.idProduct);
-
-  	printf("..Attempting to get the Device Descriptor\n");
-
-  	ret = usb_get_descriptor(devHandle, USB_DT_DEVICE, 0x00, owonDescriptorBuffer, 0x12);
-
-  	if(ret < 0) {
-	  printf("..Failed to get device descriptor %04x '%s'\n", ret, strerror(-ret));
-	  goto bail;
-	}
-	else
-	  printf("..Successfully obtained device descriptor!\n");
-/*
-	printf("..Attempting to set device to default configuration\n");
-		ret = usb_set_configuration(devHandle, DEFAULT_CONFIGURATION);
-		if(ret) {
-		  printf("..Failed to set default configuration %d '%s'\n", ret, strerror(-ret));
-		  goto bail;
-		}
-*/
-
-// clear any halt status on the bulk OUT endpoint
-	ret = usb_clear_halt(devHandle, BULK_WRITE_ENDPOINT);
-
-	printf("..Attempting to bulk write START command to device...\n");
-
-	ret = usb_bulk_write(devHandle, BULK_WRITE_ENDPOINT, OWON_START_DATA_CMD,
-			strlen(OWON_START_DATA_CMD), DEFAULT_TIMEOUT);
-
-	if(ret < 0) {
-	  printf("..Failed to bulk write %04x '%s'\n", ret, strerror(-ret));
-	  goto bail;
-	}
-	printf("..Successful bulk write of %04x bytes!\n", (unsigned int) strlen(OWON_START_DATA_CMD));
-
-	// clear any halt status on the bulk IN endpoint
-	ret = usb_clear_halt(devHandle, BULK_READ_ENDPOINT);
-
-	printf("..Attempting to bulk read %04x (%d) bytes from device...\n",(unsigned int) sizeof(owonCmdBuffer), (unsigned int)  sizeof(owonCmdBuffer));
-	ret = usb_bulk_read(devHandle, BULK_READ_ENDPOINT, owonCmdBuffer,
-			sizeof(owonCmdBuffer), DEFAULT_TIMEOUT);
-	if(ret < 0) {
-		usb_resetep(devHandle,BULK_READ_ENDPOINT);
-		printf("..Failed to bulk read: %04x (%d) bytes: '%s'\n", (unsigned int) sizeof(owonCmdBuffer),(unsigned int)  sizeof(owonCmdBuffer), strerror(-ret));
-		goto bail;
-	}
-	else
-	  printf("..Successful bulk read of %04x (%d) bytes! :\n", ret, ret);
-
-if(debug) {
-// display the contents of the BULK IN Owon Command Buffer
-	printf("\t%08x: ",0);
-	for(i=0; i<ret; i++)
-      printf("%02x ", (unsigned char)owonCmdBuffer[i]);
-    printf("\n");
-}
-// retrieve the bulk read byte count from the Owon command buffer
-// the count is held in little endian format in the first 4 bytes of that buffer
-    memcpy(&owonDataBufferSize,owonCmdBuffer,4); //  owonCmdBuffer, the source for memcpy, is little endian
-//    printf("dataBufSize = %d\n", owonDataBufferSize);
-
-    printf("..Attempting to malloc read buffer space of %08xh (%d) bytes\n", owonDataBufferSize, owonDataBufferSize);
-    owonDataBuffer = malloc(owonDataBufferSize);
+    printf("..Attempting to malloc read buffer space of %08xh (%d) bytes\n", owonFileSize, owonFileSize);
+    owonDataBuffer = malloc(owonFileSize);
     if(!owonDataBuffer) {
-      printf("..Failed to malloc(%08xh)!\n", owonDataBufferSize);
+      printf("..Failed to malloc(%08xh)!\n", owonFileSize);
       goto bail;
     }
     else
       printf("..Successful malloc!\n");
 
-    printf("..Owon ready to bulk transfer %08xh (%d) bytes\n", owonDataBufferSize, owonDataBufferSize);
+	printf("..Attempting to read %08xh (%d) bytes from file...\n", owonFileSize, owonFileSize);
+	ret = fread(owonDataBuffer, sizeof(char), owonFileSize, fp);
 
-	printf("..Attempting to bulk read %08xh (%d) bytes from device...\n", owonDataBufferSize, owonDataBufferSize);
-	ret = usb_bulk_read(devHandle, BULK_READ_ENDPOINT, owonDataBuffer,
-			owonDataBufferSize, DEFAULT_BITMAP_READ_TIMEOUT);
 	if(ret < 0) {
-	  printf("..Failed to bulk read: %xh (%d) bytes: %d - '%s'\n", owonDataBufferSize, owonDataBufferSize, ret, strerror(-ret));
-	  usb_reset(devHandle);
+	  printf("..Failed to read: %xh (%d) bytes: %d - '%s'\n", owonFileSize, owonFileSize, ret, strerror(-ret));
 	  goto bail;
 	}
 	else
-	  printf("..Successful bulk read of %08xh (%d) bytes! : \n", ret, ret);
+	  printf("..Successful read of %08xh (%d) bytes! : \n", ret, ret);
 
 if (debug) {
-// hexdump the first 0x40 bytes of the BULK IN Owon Data Buffer
-	printf("..Hexdump of first 0x40 bytes of the BULK IN Owon Data Buffer :\n");
+// hexdump the first 0x40 bytes of the Owon file Buffer
+	printf("..Hexdump of first 0x40 bytes of the Owon binary file:\n");
     for(i=0; i<=0x03; i++) {
       printf("\t%08x: ",i);
       for(j=0;j<0x10;j++)
@@ -431,46 +296,45 @@ if (debug) {
     if(*owonDataBuffer=='B' &&  *(owonDataBuffer+1)=='M')
         printf("640x480 bitmap of %04xh (%d) bytes\n", (int) *(owonDataBuffer+2), *(owonDataBuffer+2));
 
-// is it a vectorgram ('SPB') ?   If so, we decode the contents..
+// is it a vectorgram ('SPBV') ?   If so, we decode the contents..
 
     else if(*owonDataBuffer=='S' &&  *(owonDataBuffer+1)=='P' && *(owonDataBuffer+2)=='B') {
-     	switch (*(owonDataBuffer+3)) {
+    	switch (*(owonDataBuffer+3)) {
 			case 'V' :	printf("..Found data from Owon PDS5022S\n");
 						break;
-			case 'W' :	printf("..Found data from Owon PDS6060S\n");
+			case 'W' :	printf("..Found data from Owon PDS6062S\n");
 						break;
-			default	 : 	printf("..Found data from Owon unknown model\n");
-     	}
+			default	 :	printf("..Found data from Owon unknown model\n");
+			}
 
-    	printf("..Found vector gram data\n");
+    	printf("..Found vectorgram data\n");
+
 // initialise the header pointer to the first header in the data
-    	headerptr = owonDataBuffer + VECTORGRAM_FILE_HEADER_LENGTH;	// jump over the "SPB...." file header
-/*
-    	printf("!!! owonDataBuffer = 0x%p\n", owonDataBuffer);
-    	printf("!!! owonDataBufferSize = %x (%d)\n", owonDataBufferSize, owonDataBufferSize);
-    	printf("!!! VECTORGRAM_FILE_HDR_LENGTH= %02x\n", VECTORGRAM_FILE_HEADER_LENGTH);
-    	printf("!!! headerptr = 0x%p\n", headerptr);
-    	printf("!!! owondatabuffer + owonDataBufferSize = 0x%p    headerptr = 0x%p\n", owonDataBuffer+owonDataBufferSize, headerptr);
-    	printf("!!! owondatabuffer + owonDataBufferSize (0x%p) > headerptr (0x%p) = %d\n", owonDataBuffer+owonDataBufferSize , headerptr, owonDataBuffer+owonDataBufferSize > headerptr);
-*/
-    	while( (owonDataBuffer + owonDataBufferSize) > headerptr) {
- if (debug) {
-    		// hexdump the first 0x40 bytes of channel header
+
+    	headerptr = owonDataBuffer + VECTORGRAM_FILE_HEADER_LENGTH;	// jump over the 10 byte "SPB...." file header
+
+//    	printf("owonDataBuffer = %Ld\n", (long long int)owonDataBuffer);
+//    	printf("headerptr = (oDB + FILE_HDR_LEN (%d) = %Ld\n", VECTORGRAM_FILE_HEADER_LENGTH,  (long long int)headerptr);
+//    	printf("owonFileSize = %Ld\n", (long long int)owonFileSize);
+
+    	while((owonDataBuffer+owonFileSize) > headerptr) {
+if (debug) {
+    		// hexdump the first 0x50 bytes of channel header
     			printf("..Hexdump of channel header :\n");
-    		    for(i=0; i<=0x04; i++) {
+    		    for(i=0; i<=0x05; i++) {
     		      printf("\t%08x: ",i);
     		      for(j=0;j<0x10;j++)
     		    	printf("%02x ", (unsigned char) *(headerptr+(i*0x10)+j));
     		      printf("\n");
     		    }
- }
+}	// end if (debug)
     		headers[channelcount] = decodeVectorgramBufferHeader(headerptr);
     		headerptr += (int) headers[channelcount].blocklength;
-    		headerptr += 3; 									// and jump over the channel name itself
+    		headerptr += 3; // and jump over the channel name itself
     		channelcount++;
     	}
 //        for(i=0;i<channelcount;i++)
-//        	printf("%s has %d samples\n", headers[i].channelname, (int) headers[i].blocklength/2);
+//        	printf("%s has %d samples\n", headers[i].channelname, (int) headers[i].samplecount1); 	// (16 bits used per sample)
     }
 // is it neither a BM (bitmap) nor a SPB (vectorgram) ?
     else {
@@ -478,49 +342,38 @@ if (debug) {
 		printf("%c %c %c %c\n", *owonDataBuffer, *(owonDataBuffer+1), *(owonDataBuffer+2), *(owonDataBuffer+3));
     }
 
-// dump the buffer to disk file either as raw data or as tabulated text data as well.
+// dump the buffer to disk as tabulated text data.
 
-    if(text)
-    	writeTextData(owonDataBuffer, owonDataBufferSize);
-
-    writeRawData(owonDataBuffer, owonDataBufferSize);
+    writeTextData(owonDataBuffer, owonFileSize);
 
     free(owonDataBuffer);	// a buffer of vectorgrams is just a few KB in size
 							// but for bitmaps this buffer could be very large (~1MB)
 
-    printf("..Attempting to release interface %d\n", DEFAULT_INTERFACE);
-    ret = usb_release_interface(devHandle, DEFAULT_INTERFACE);
-    if(ret) {
-      printf("Failed to release interface %d: '%s'\n", DEFAULT_INTERFACE, strerror(-ret));
-	  goto bail;
-    }
-	printf("..Successful release of interface %d!\n", DEFAULT_INTERFACE);
-
 bail:
-	usb_reset(devHandle);
-	usb_close(devHandle);
 	return;
 }
 
 int main(int argc, char *argv[]) {
 
+  FILE *fp;
+
+//  printf("..Size of short int=%d, int=%d, long int = %d,  long long int = %d \n", (int) sizeof(short int), (int) sizeof(int), (int) sizeof(long int), (int) sizeof(long long int));
+
   if (argc>1) {
 	  filename = malloc(strlen(argv[1]));
 	  memcpy(filename, argv[1], strlen(argv[1]));
   }
-
-  printf("..Initialising libUSB\n");
-  usb_init();
-
-  printf("..Searching USB buses for Owon\n");
-
-  if(!devfindOwon()) {
-	  printf("..No Owon device %04x:%04x found\n", USB_LOCK_VENDOR, USB_LOCK_PRODUCT);
+  else {
+	  printf("..Usage: owonfileread owonbinary filename\n");
 	  return 0;
   }
-  else
-	readOwonMemory(usb_locks[0]);
-//	for(i = 0; i < locksFound; i++)
-//	  readOwonMemory(usb_locks[i]);
+
+  if ((fp = fopen(filename, "r")) == NULL) {
+	  printf("..Couldn\'t open %s\n", filename);
+	  return 0;
+  }
+
+  readOwonBinFile(fp);
+  fclose(fp);
   return 0;
 }

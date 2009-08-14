@@ -17,6 +17,10 @@ About
 	Once the channel vectorgram data has been retrieved from the scope, it is parsed into a
 	tabulated text file format that can be displayed using GNUplot or similar plotting packages.
 
+	A second utility called owonfileread is included. Owonfileread takes a binary trace dump
+	file obtained from owondump or from the Owon application for Windows. The binary file is
+	parsed and the trace data is written out in the same tabulated text file format.
+
 
 Author
 ======
@@ -24,7 +28,7 @@ Author
 	Owondump was written by Michael Murphy and is released to the public under the terms of
 	the GNU GPL, or General Public License. 	
 	
-	Copyright June 2009, Michael Murphy <ee07m060@elec.qmul.ac.uk>
+	Copyright August 2009, Michael Murphy <ee07m060@elec.qmul.ac.uk>
 
 
 Licence
@@ -51,106 +55,87 @@ Compiling
 =========
 
 	gcc -lusb -o owondump owondump.c
+	gcc -lusb -o owonfileread owonfileread.c
 		
 Running
 =======
 
-	[michael@epox owondump]$ ./owondump test.bin
+	[michael@core2quad owondump]$ ./owondump
 
 	..Initialising libUSB
 	..Searching USB buses for Owon
-	..Found an Owon device 5345:1234 on bus 001
+	..Found an Owon device 5345:1234 on bus 002
 	..Resetting device.
 	..Attempting USB lock on device  5345:1234
-	..Trying to claim interface 0 of 5345:1234
-	..Successfully claimed interface 0 to 5345:1234
+	..Trying to claim interface 0 of 5345:1234 
+	..Successfully claimed interface 0 to 5345:1234 
 	..Attempting to get the Device Descriptor
 	..Successfully obtained device descriptor!
 	..Attempting to bulk write START command to device...
 	..Successful bulk write of 0005 bytes!
 	..Attempting to bulk read 000c (12) bytes from device...
 	..Successful bulk read of 000c (12) bytes! :
-	..Attempting to malloc read buffer space of 00004e90h (20112) bytes
+	..Attempting to malloc read buffer space of 000075d3h (30163) bytes
 	..Successful malloc!
-	..Owon ready to bulk transfer 00004e90h (20112) bytes
-	..Attempting to bulk read 00004e90h (20112) bytes from device...
-	..Successful bulk read of 00004e90h (20112) bytes! :
+	..Owon ready to bulk transfer 000075d3h (30163) bytes
+	..Attempting to bulk read 000075d3h (30163) bytes from device...
+	..Successful bulk read of 000075d3h (30163) bytes! : 
+	..Found data from Owon PDS5022S
 	..Found vector gram data
 	-------------------------------
-		      Channel: CH1
-     	         sample count: 5024
- 	 vertical sensitivity: 20mV
-              	     timebase: 10ms
+	              Channel: CH1
+	         sample count: 5000
+	 vertical sensitivity: 2000mV
+	             timebase: 0.5ms
+	-------------------------------
+	-------------------------------
+	              Channel: CH2
+	         sample count: 5000
+	 vertical sensitivity: 2000mV
+	             timebase: 0.5ms
+	-------------------------------
 	-------------------------------
 	              Channel: CHA
-    	         sample count: 5024
- 	 vertical sensitivity: 10mV
-                     timebase: 10ms
+	         sample count: 5000
+	 vertical sensitivity: 2000mV
+	             timebase: 0.5ms
 	-------------------------------
-	..Successfully opened text file 'test.bin.txt'!
-	..Successfully closed text file 'test.bin.txt'!
-	..Successfully opened file 'test.bin'!
-	..Successfully written 20112 bytes to file test.bin
+	..Successfully opened text file 'output.bin.txt'!
+	..Successfully written trace data to 'output.bin.txt'!
+	..Successfully closed text file 'output.bin.txt'!
+	..Successfully opened file 'output.bin'!
+	..Successfully written 30163 bytes to file output.bin
 	..Attempting to release interface 0
 	..Successful release of interface 0!
 
-	[michael@epox owondump]$ cat test.bin.txt                                 		
-		
-	# Units:(mV)
-	#                 CH1             CHA
-	0                26.0             0.0
-	1                26.0             1.0
-	2                25.0             0.0
-	3                25.0             0.0
-	4                26.0             0.0
-	5                26.0             0.0
-	6                26.0             0.0
-	7                26.0             0.0
-	8                25.0             0.0
-	9                26.0             0.0
-	10               25.0             0.0
-	11               26.0             0.0
-	12               26.0             0.0
-	13               26.0             0.0
-	14               26.0            -1.0
-	15               26.0            -1.0
-	16               27.0            -1.0
-	17               26.0            -1.0
-	18               26.0            -1.0
-	19               26.0            -1.0
-	20               26.0            -2.0
-	21               26.0            -1.0
-	22               27.0            -1.0
-	23               26.0            -1.0
-	24               26.0            -2.0
-	25               26.0            -2.0
-	26               28.0            -2.0
-	27               26.0            -2.0
-	28               26.0            -2.0
-	29               27.0            -2.0
-	30               27.0            -2.0
-	31               27.0            -2.0
-	32               26.0            -3.0
-	33               27.0            -3.0
-	34               26.0            -3.0
-	35               26.0            -3.0
-	36               27.0            -4.0
-	37               26.0            -4.0
-	38               27.0            -4.0
-	39               27.0            -4.0
-	40               28.0            -4.0
-	41               27.0            -4.0
-	42               27.0            -4.0
-	43               26.0            -4.0
-	44               27.0            -4.0
-	45               27.0            -5.0
-	46               26.0            -5.0
+	[michael@core2quad owondump]$ cat output.bin.txt
+
+	# Units:(mV) -- Timebase: (0.5ms)
+	#		  CH1		  CH2		  CHA
+	1		4880.0		5040.0		4880.0
+	2		4880.0		4960.0		4880.0
+	3		4880.0		4960.0		4880.0
+	4		4880.0		4960.0		4880.0
+	5		4880.0		5040.0		4880.0
+	6		4880.0		5040.0		4880.0
+	7		4880.0		4960.0		4960.0
+	8		4880.0		4960.0		4880.0
+	9		4880.0		5040.0		4880.0
+	10		4960.0		5040.0		4960.0
+	11		4880.0		5040.0		4960.0
+	12		4960.0		5040.0		4880.0
+	13		4880.0		4960.0		4880.0
+	14		4880.0		4960.0		4880.0
+	15		4880.0		5040.0		4960.0
+	16		4880.0		5040.0		4960.0
+	17		4880.0		4960.0		4880.0
+	18		4880.0		5040.0		4880.0
+	19		4880.0		4960.0		4880.0
 	[..]
 
-	[michael@epox owondump]$ gnuplot test.bin.txt                                 		
-
-	gnuplot> [0:4995] 'test.bin.txt' u ($2*0.5) s b w l lw 5 t 'CH1 20mV 10ms', 'test.bin.txt' u 3 s b w l lw 5 t 'CHA 10mV 10ms'
-
+	gnuplot> set terminal jpeg 
+	gnuplot> set output 'trace.jpg'
+	gnuplot> plot 'test.bin.txt' u 2 s b w l lw 5 t 'CH1 5000mV 500ns', 'test.bin.txt' u 4 s b w l lw 5 t 'CHA 5000mV 500ns'
 	
 Concluding Notes	
 ================
@@ -167,6 +152,10 @@ Concluding Notes
 	the BULK IN endpoint gets stuck, and cannot be shifted. Without that reset, the BULK IN transfers would
 	otherwise timeout. 
 
+	A thank you to Eamon "Ed" Skelton of Cork, Ireland, for help and support in providing trace binaries 
+	for the PDS6062S oscilloscope.
+
+
 	All comments welcomed!
 	
-	Michael Murphy - <ee07m060@elec.qmul.ac.uk> - June 2009
+	Michael Murphy - <ee07m060@elec.qmul.ac.uk> - August 2009

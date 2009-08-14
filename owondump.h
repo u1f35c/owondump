@@ -14,14 +14,15 @@
 #define MAX_HEADER_LENGTH 0x40
 #define VECTORGRAM_FILE_HEADER_LENGTH 10  // for vectorgrams, the data header begins 10 bytes after file header
 #define VECTORGRAM_BLOCK_HEADER_LENGTH 51
+#define VECTORGRAM_BLOCK_HEADER_CHNAMELEN 3	// "CH1", "CH2", "CHA", etc.
 
 // this is the structure of the header that precedes each block of channel data sent by the Owon
 
 struct channelHeader {
 	char channelname[3];	// 3 bytes ( {"CH1", "CH2", "CHA", "CHB", "CHC", "CHD"} )
 	long int blocklength;	// 4 bytes (little endian long int holding data block length)
-	long int unknown1;		// 4 bytes (purpose unknown)
-	long int unknown2;		// 4 bytes (purpose unknown)
+	long int samplecount1;	// 4 bytes (little endian long int holding the count of samples)
+	long int samplecount2;	// 4 bytes (little endian long int holding the count of samples)
 	long int unknown3;		// 4 bytes (purpose unknown)
 	long int timebasecode;	// 4 bytes (little endian long int holding timebase code - 0x00000000 (5ns) to 0x000000ff (100s)
 	long int unknown4;		// 4 bytes (purpose unknown)
@@ -32,6 +33,8 @@ struct channelHeader {
 	long int unknown8;		// 4 bytes (purpose unknown)
 	long int unknown9;		// 4 bytes (purpose unknown)
 
+// these last three should be in a separate structure since they are not contained in the binary header
 	int vertSensitivity;	// 5mV through 5000mV (5V)
 	long long int timeBase; // in nanoseconds (10E-9)
 };
+
