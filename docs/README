@@ -7,12 +7,12 @@ About
 	data is made available on the PC in both vectorgram format and in the bitmap BMP format.
 
 	Owondump was originally designed for the 25MHz PDS5022s "Academic" Scope from Owon, but
-	it probably works for other scopes in the same range. 
+	it now works for other scopes in the same range, including the PDS6062.
 	
-	Owondump was originally intended for *nix machines since the manufacturer only provides
-	a closed-source binary for Microsoft Windows and, worse, that binary won't even run in
-	WINE. However, it should also be possible to build Owondump against libusb-win32, the
-	Windows port of the library.   
+	Owondump was primarily intended for *nix machines since the manufacturer there is only
+	a closed-source binary for Microsoft Windows which won't run in WINE, because of the
+	lack of USB support.  However, it should also be possible to build Owondump against
+	libusb-win32, the Windows port of the library.   
 	
 	Once the channel vectorgram data has been retrieved from the scope, it is parsed into a
 	tabulated text file format that can be displayed using GNUplot or similar plotting packages.
@@ -21,6 +21,9 @@ About
 	file obtained from owondump or from the Owon application for Windows. The binary file is
 	parsed and the trace data is written out in the same tabulated text file format.
 
+	A very useful third utility called readtrace is included. It was written by Michel Pollet.
+	It is a TCL script to parse the trace dump and detect edges and deduce the frequency.
+
 
 Author
 ======
@@ -28,8 +31,7 @@ Author
 	Owondump was written by Michael Murphy and is released to the public under the terms of
 	the GNU GPL, or General Public License. 	
 	
-	Copyright August 2009, Michael Murphy <ee07m060@elec.qmul.ac.uk>
-
+	Copyright May 2010, Michael Murphy <ee07m060@elec.qmul.ac.uk>
 
 Licence
 =======
@@ -152,10 +154,23 @@ Concluding Notes
 	the BULK IN endpoint gets stuck, and cannot be shifted. Without that reset, the BULK IN transfers would
 	otherwise timeout. 
 
-	A thank you to Eamon "Ed" Skelton of Cork, Ireland, for help and support in providing trace binaries 
-	for the PDS6062S oscilloscope.
+	Thank you to :
 
+		Owon / Lilliput Technologies for manufacturing a very nice range of oscilloscopes,
+		and for contributing to the Open Source software community.
 
-	All comments welcomed!
+		Pavel Čejka for his encouragement and for his very kind words to Owon :-)
+
+		Eamon "Ed" Skelton of Cork, Ireland, for help and support in providing trace binaries 
+		for the PDS6062S oscilloscope.
+
+		Michel Pollet for his bug squishing, his elegant method of factoring the timebase, and
+		for writing readtrace, a tool for edge detection and frequency determination.
+
+		Lucas Salvador for his offer to translate the software into Spanish.
+
+		No doubt many others I have forgotten.
+
+	All comments and contributions welcomed!
 	
-	Michael Murphy - <ee07m060@elec.qmul.ac.uk> - August 2009
+	Michael Murphy - <ee07m060@elec.qmul.ac.uk> - May 2010
