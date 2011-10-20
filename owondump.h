@@ -19,19 +19,19 @@
 // this is the structure of the header that precedes each block of channel data sent by the Owon
 
 struct channelHeader {
-	char channelname[3];	// 3 bytes ( {"CH1", "CH2", "CHA", "CHB", "CHC", "CHD"} )
-	long int blocklength;	// 4 bytes (little endian long int holding data block length)
-	long int samplecount1;	// 4 bytes (little endian long int holding the count of samples)
-	long int samplecount2;	// 4 bytes (little endian long int holding the count of samples)
-	long int unknown3;		// 4 bytes (purpose unknown)
-	long int timebasecode;	// 4 bytes (little endian long int holding timebase code - 0x00000000 (5ns) to 0x000000ff (100s)
-	long int unknown4;		// 4 bytes (purpose unknown)
-	long int vertsenscode;	// 4 bytes (little endian long int holding vertical sensitivity code - 0x00000001 (5mV) to 0x0000000A (5V)
-	long int unknown5;		// 4 bytes (purpose unknown)
-	long int unknown6;		// 4 bytes (purpose unknown)
-	long int unknown7;		// 4 bytes (purpose unknown)
-	long int unknown8;		// 4 bytes (purpose unknown)
-	long int unknown9;		// 4 bytes (purpose unknown)
+	char channelname[4];	// 3 bytes ( {"CH1", "CH2", "CHA", "CHB", "CHC", "CHD"} )
+	unsigned blocklength;	// 4 bytes (little endian long int holding data block length)
+	unsigned samplecount1;	// 4 bytes (little endian long int holding total number of samples)
+	unsigned samplecount2;	// 4 bytes (little endian long int holding the number of used samples)
+	unsigned startoffset;	// 4 bytes (offset of first used sample (actually last?)
+	unsigned timebasecode;	// 4 bytes (little endian long int holding timebase code - 0x00000000 (5ns) to 0x000000ff (100s)
+	int      v_position;	// 4 bytes (vertical position in screen coordinates)
+	unsigned vertsenscode;	// 4 bytes (little endian long int holding vertical sensitivity code - 0x00000001 (5mV) to 0x0000000A (5V)
+	unsigned probexcode;	// 4 bytes (probe mult code 0: x1, 1: x10, 2: x100...)
+	float    t_sample;	// 4 bytes time between samples (us)
+	float unknown7;		// 4 bytes (purpose unknown - trigger related?)
+	float unknown8;		// 4 bytes (purpose unknown)
+	float unknown9;		// 4 bytes (purpose unknown)
 
 // these last three should be in a separate structure since they are not contained in the binary header
 	int vertSensitivity;	// 5mV through 5000mV (5V)

@@ -79,6 +79,13 @@ long long int decodeTimebase(long int i) {
 	return timebase;
 }
 
+
+uint32_t get_uint32(char *p) {
+	uint32_t a;
+	memcpy(&a, p,4); // TODO: fix big endian issue
+	return a;
+}
+
 // decode the contents of the vectorgram data header - providing us with the timebase and voltage values for the channel data
 // hdrBuf has already been stripped of the 10 byte vectorgram file header that begins "SPBV......"
 // returns the size of the channel data block in bytes
@@ -89,15 +96,16 @@ struct channelHeader decodeVectorgramBufferHeader(char *hdrBuf) {
 // if not a bitmap then must be a vectorgram
 	memcpy(&header.channelname,hdrBuf,3);
 	header.channelname[3]='\0';
-	memcpy(&header.blocklength, hdrBuf+3,4);
-	memcpy(&header.samplecount1, hdrBuf+7,4);
-	memcpy(&header.samplecount2, hdrBuf+11,4);
-	memcpy(&header.unknown3, hdrBuf+15,4);
-	memcpy(&header.timebasecode, hdrBuf+19,4);
-	memcpy(&header.unknown4, hdrBuf+23,4);
-	memcpy(&header.vertsenscode, hdrBuf+27,4);
-	memcpy(&header.unknown5, hdrBuf+31,4);
-	memcpy(&header.unknown6, hdrBuf+35,4);
+	header.blocklength = get_uint32(hdrBuf+3);
+	header.samplecount1 = get_uint32(hdrBuf+7);
+	header.samplecount2 = get_uint32(hdrBuf+11);
+	header.startoffset = get_uint32(hdrBuf+15);
+	header.timebasecode = get_uint32(hdrBuf+19);
+	header.v_position = (int)get_uint32(hdrBuf+23);
+	header.vertsenscode = get_uint32(hdrBuf+27);
+	header.probexcode = get_uint32(hdrBuf+31);
+
+	memcpy(&header.t_sample, hdrBuf+35,4);
 	memcpy(&header.unknown7, hdrBuf+39,4);
 	memcpy(&header.unknown8, hdrBuf+43,4);
 	memcpy(&header.unknown9, hdrBuf+43,4);
@@ -106,25 +114,26 @@ struct channelHeader decodeVectorgramBufferHeader(char *hdrBuf) {
 	header.vertSensitivity = decodeVertSensCode(header.vertsenscode);	// 5mV through 5000mV (5V)
 	header.timeBase = decodeTimebase(header.timebasecode);		    	// in nanoseconds (10E-9)
 
-	printf("Channel: %4s samples: %6d sensitivity: %6d mV timebase: %8d us (coce %ld)\n", 
+	printf("Channel: %4s samples: %6u sensitivity: %6u mV timebase: %8d us (code %u) t_sample: %g us\n",
 		header.channelname,
-		(int) header.samplecount1,
+		header.samplecount1,
 		header.vertSensitivity,
 		(int)(header.timeBase / 1000), 
-		(long int)header.timebasecode);
+		header.timebasecode,
+		header.t_sample);
 if(debug) {
-	printf(" data block length: %08x (%d) bytes\n", (int) header.blocklength, (int) header.blocklength);
- 	printf("      samplecount1: %08x (%d)\n", (int) header.samplecount1, (int) header.samplecount1);
-	printf("      samplecount2: %08x (%d)\n", (int) header.samplecount2, (int) header.samplecount2);
-	printf("          unknown3: %08x (%d)\n", (int) header.unknown3, (int) header.unknown3);
-	printf("     timebase code: %08x (%d)\n", (int) header.timebasecode, (int) header.timebasecode);
-	printf("    	  unknown4: %08x (%d)\n", (int) header.unknown4, (int) header.unknown4);
-	printf("    vert sens code: %08x (%d)\n", (int) header.vertsenscode, (int) header.vertsenscode);
-	printf("    	  unknown5: %08x (%d)\n", (int) header.unknown5, (int) header.unknown5);
-	printf("          unknown6: %08x (%d)\n", (int) header.unknown6, (int) header.unknown6);
-	printf("    	  unknown7: %08x (%d)\n", (int) header.unknown7, (int) header.unknown7);
-    printf("          unknown8: %08x (%d)\n", (int) header.unknown8, (int) header.unknown8);
-    printf("          unknown9: %08x (%d)\n", (int) header.unknown9, (int) header.unknown9);
+	printf(" data block length: %08x (%u) bytes\n", header.blocklength, header.blocklength);
+ 	printf("      samplecount1: %08x (%u)\n", header.samplecount1, header.samplecount1);
+	printf("      samplecount2: %08x (%u)\n", header.samplecount2, header.samplecount2);
+	printf("      sampleoffset: %08x (%u)\n", header.startoffset, header.startoffset);
+	printf("     timebase code: %08x (%u)\n", header.timebasecode, header.timebasecode);
+	printf("    	v_position: %08x (%d)\n", header.v_position, header.v_position);
+	printf("    vert sens code: %08x (%u)\n", header.vertsenscode, header.vertsenscode);
+	printf("   probe mult code: %08x (%u)\n", header.probexcode, header.probexcode);
+	printf("          t_sample: %g us\n", header.t_sample);
+	printf("    	  unknown7: %g\n", header.unknown7);
+    printf("          unknown8: %g\n", header.unknown8);
+    printf("          unknown9: %g\n", header.unknown9);
     printf("\n");
 	printf("-------------------------------\n");
 	printf("\n");
@@ -164,14 +173,14 @@ struct usb_device *devfindOwon() {
 	  return (NULL);		// No Owon found
 }
 
-void writeRawData(char *buf, int count) {
+void writeRawData(const unsigned char *buf, int count) {
 	FILE *fp;
 
 	if ((fp=fopen(filename,"w")) == NULL) {
 	  printf("..Failed to open file \'%s\'!\n", filename);
 	  return;
 	}
-	else
+//	else 
 //      printf("..Successfully opened file \'%s\'!\n", filename);
 
 	if (fwrite(buf,sizeof(unsigned char), count, fp) != count)
@@ -184,12 +193,12 @@ void writeRawData(char *buf, int count) {
 }
 
 
-void writeTextData(char *buf, int count) {
+void writeTextData(const unsigned char *buf, int count) {
 	FILE *fpout;
-	unsigned char *ptr[channelcount];
-
+	const unsigned char *ptr[channelcount];
 	int i,j;
 	char txtfilename[strlen(filename)+3];
+
 	strcpy(txtfilename,filename);
 	strcat(txtfilename,".txt");
 	if ((fpout = fopen(txtfilename,"w")) == NULL) {
@@ -198,7 +207,10 @@ void writeTextData(char *buf, int count) {
 	}
 //	printf("..Successfully opened text file \'%s\'!\n", txtfilename);
 
-	fprintf(fpout,"# Timebase: %g us Samples: %ld\n", (double) headers[0].timeBase / 1000, headers[0].samplecount1);
+	fprintf(fpout,"# Timebase: %g us Samples: %u t_sample: %g us\n",
+		(double) headers[0].timeBase / 1000,
+		headers[0].samplecount1,
+		headers[0].t_sample);
 
 	ptr[0] = buf;									// initialise first pointer to start of char *buf
 	ptr[0] += VECTORGRAM_FILE_HEADER_LENGTH;		// +10 bytes to jump over the file header
@@ -418,12 +430,12 @@ if (debug) {
     		    }
  }
     		headers[channelcount] = decodeVectorgramBufferHeader(headerptr);
-    		headerptr += (int) headers[channelcount].blocklength;
+    		headerptr += headers[channelcount].blocklength;
     		headerptr += 3; 									// and jump over the channel name itself
     		channelcount++;
     	}
 //        for(i=0;i<channelcount;i++)
-//        	printf("%s has %d samples\n", headers[i].channelname, (int) headers[i].blocklength/2);
+//        	printf("%s has %u samples\n", headers[i].channelname, headers[i].blocklength/2);
     }
 // is it neither a BM (bitmap) nor a SPB (vectorgram) ?
     else {
@@ -434,9 +446,9 @@ if (debug) {
 // dump the buffer to disk file either as raw data or as tabulated text data as well.
 
     if(text)
-    	writeTextData(owonDataBuffer, owonDataBufferSize);
+    	writeTextData((const unsigned char*)owonDataBuffer, owonDataBufferSize);
 
-    writeRawData(owonDataBuffer, owonDataBufferSize);
+    writeRawData((const unsigned char*)owonDataBuffer, owonDataBufferSize);
 
     free(owonDataBuffer);	// a buffer of vectorgrams is just a few KB in size
 							// but for bitmaps this buffer could be very large (~1MB)
