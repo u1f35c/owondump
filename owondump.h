@@ -35,6 +35,7 @@ struct channelHeader {
 
 // these last three should be in a separate structure since they are not contained in the binary header
 	int vertSensitivity;	// 5mV through 5000mV (5V)
-	long long int timeBase; // in nanoseconds (10E-9)
+	unsigned samplePerDiv;	// samples per division (something like 100 to 625)
+	double timeBase;        // in nanoseconds (10E-9)
 };
 

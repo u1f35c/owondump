@@ -28,17 +28,14 @@ int locksFound = 0;
 char *filename = "output.bin";			  // default output filename
 int text = 1;							  // tabulated text output as well as raw data output
 int channelcount = 0;					  // the number of channels in the data dump
-int hscale_10_25_50 = 0;				  // hscale is 10, 25 and 50 or 10, 20 and 50
 
 
 struct channelHeader headers[10];		  // provide for up to ten scope channels
 
-int decodeVertSensCode(long int i) {
-// This is the one byte vertical sensitivity code
-	char c = (char) i;
+int decodeVertSensCode(int sens_code, int probex_code) {
 	int vertSensitivity=-1;
-	switch (c) {
-	  case 0x01	: vertSensitivity = 5;		// 5mV
+	switch (sens_code) {
+	  case 0x01 : vertSensitivity = 5;		// 5mV
 				  break;
 	  case 0x02 : vertSensitivity = 10;
 				  break;
@@ -46,7 +43,7 @@ int decodeVertSensCode(long int i) {
 				  break;
 	  case 0x04 : vertSensitivity = 50;
 	  			  break;
-	  case 0x05	: vertSensitivity = 100;
+	  case 0x05 : vertSensitivity = 100;
 				  break;
 	  case 0x06 : vertSensitivity = 200;
 				  break;
@@ -59,24 +56,18 @@ int decodeVertSensCode(long int i) {
 	  case 0x0A : vertSensitivity = 5000;	// 5V
 				  break;
 	}
+
+	switch (probex_code) {
+	  case 0x00 : vertSensitivity *= 1;		// x1
+				  break;
+	  case 0x01 : vertSensitivity *= 10;            // x10
+				  break;
+	  case 0x02 : vertSensitivity *= 100;
+				  break;
+	  case 0x03 : vertSensitivity *= 1000;
+        }
+
 	return vertSensitivity;
-}
-
-
-// Is this Timebase really useful? The timebase is the time it takes to render
-// one div on the screen - but there are between 100 and 625 samples per div.
-// As an example: the time between each sample is the same for timebase
-// 200ns, 500ns and 1us: 2ns (only the samples per div changes 100, 250, 500)
-long long int decodeTimebase(long int i) {
-	static const int factor_25[] = { 5, 10, 25 };
-	static const int factor_20[] = { 5, 10, 20 };
-
-	const int *factor = (hscale_10_25_50)? factor_25: factor_20;
-	long long timebase = factor[i % 3];
-	i /= 3;
-	while (i--)
-		timebase *= 10LL;
-	return timebase;
 }
 
 
@@ -111,14 +102,14 @@ struct channelHeader decodeVectorgramBufferHeader(char *hdrBuf) {
 	memcpy(&header.unknown9, hdrBuf+43,4);
 
 
-	header.vertSensitivity = decodeVertSensCode(header.vertsenscode);	// 5mV through 5000mV (5V)
-	header.timeBase = decodeTimebase(header.timebasecode);		    	// in nanoseconds (10E-9)
-
-	printf("Channel: %4s samples: %6u sensitivity: %6u mV timebase: %8d us (code %u) t_sample: %g us\n",
+	header.vertSensitivity = decodeVertSensCode(header.vertsenscode, header.probexcode);	// 5mV through 5000mV (5V)
+	header.samplePerDiv = header.samplecount1/10;
+	header.timeBase = header.t_sample * header.samplePerDiv * 1000;		    	// in nanoseconds (10E-9)
+	printf("Channel: %4s samples: %6u sensitivity: %6u mV timebase: %g us (code %u) t_sample: %g us\n", 
 		header.channelname,
 		header.samplecount1,
 		header.vertSensitivity,
-		(int)(header.timeBase / 1000), 
+		header.timeBase / 1000, 
 		header.timebasecode,
 		header.t_sample);
 if(debug) {
@@ -208,7 +199,7 @@ void writeTextData(const unsigned char *buf, int count) {
 //	printf("..Successfully opened text file \'%s\'!\n", txtfilename);
 
 	fprintf(fpout,"# Timebase: %g us Samples: %u t_sample: %g us\n",
-		(double) headers[0].timeBase / 1000,
+		headers[0].timeBase / 1000,
 		headers[0].samplecount1,
 		headers[0].t_sample);
 
@@ -389,20 +380,17 @@ if (debug) {
 
 // is it a 'BM' (bitmap) ?
     if(*owonDataBuffer=='B' &&  *(owonDataBuffer+1)=='M')
-        printf("640x480 bitmap of %04xh (%d) bytes\n", (int) *(owonDataBuffer+2), *(owonDataBuffer+2));
+        printf("640x480 bitmap of %04xh (%u) bytes\n", *(owonDataBuffer+2), *(owonDataBuffer+2));
 
 // is it a vectorgram ('SPB') ?   If so, we decode the contents..
 
     else if(*owonDataBuffer=='S' &&  *(owonDataBuffer+1)=='P' && *(owonDataBuffer+2)=='B') {
      	switch (*(owonDataBuffer+3)) {
 			case 'V' :	printf("..Found data from Owon PDS5022S\n");
-						hscale_10_25_50 = 1;
 						break;
 			case 'W' :	printf("..Found data from Owon PDS6060S\n");
-						hscale_10_25_50 = 0;
 						break;
 			case 'X' :	printf("..Found data from Owon PDS7102T\n");
-						hscale_10_25_50 = 0;
 						break;
 			default	 : 	printf("..Found data from Owon unknown model\n");
      	}
