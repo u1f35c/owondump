@@ -28,6 +28,8 @@ int locksFound = 0;
 char *filename = "output.bin";			  // default output filename
 int text = 1;							  // tabulated text output as well as raw data output
 int channelcount = 0;					  // the number of channels in the data dump
+int hscale_10_25_50 = 0;				  // hscale is 10, 25 and 50 or 10, 20 and 50
+
 
 struct channelHeader headers[10];		  // provide for up to ten scope channels
 
@@ -60,8 +62,16 @@ int decodeVertSensCode(long int i) {
 	return vertSensitivity;
 }
 
+
+// Is this Timebase really useful? The timebase is the time it takes to render
+// one div on the screen - but there are between 100 and 625 samples per div.
+// As an example: the time between each sample is the same for timebase
+// 200ns, 500ns and 1us: 2ns (only the samples per div changes 100, 250, 500)
 long long int decodeTimebase(long int i) {
-	int factor[] = { 5, 10, 25 };
+	static const int factor_25[] = { 5, 10, 25 };
+	static const int factor_20[] = { 5, 10, 20 };
+
+	const int *factor = (hscale_10_25_50)? factor_25: factor_20;
 	long long timebase = factor[i % 3];
 	i /= 3;
 	while (i--)
@@ -374,8 +384,13 @@ if (debug) {
     else if(*owonDataBuffer=='S' &&  *(owonDataBuffer+1)=='P' && *(owonDataBuffer+2)=='B') {
      	switch (*(owonDataBuffer+3)) {
 			case 'V' :	printf("..Found data from Owon PDS5022S\n");
+						hscale_10_25_50 = 1;
 						break;
 			case 'W' :	printf("..Found data from Owon PDS6060S\n");
+						hscale_10_25_50 = 0;
+						break;
+			case 'X' :	printf("..Found data from Owon PDS7102T\n");
+						hscale_10_25_50 = 0;
 						break;
 			default	 : 	printf("..Found data from Owon unknown model\n");
      	}
