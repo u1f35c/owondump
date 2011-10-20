@@ -187,7 +187,9 @@ void writeRawData(const unsigned char *buf, int count) {
 void writeTextData(const unsigned char *buf, int count) {
 	FILE *fpout;
 	const unsigned char *ptr[channelcount];
+	unsigned int  offset[channelcount], n_samples;
 	int i,j;
+	double time = 0;
 	char txtfilename[strlen(filename)+3];
 
 	strcpy(txtfilename,filename);
@@ -207,30 +209,41 @@ void writeTextData(const unsigned char *buf, int count) {
 	ptr[0] += VECTORGRAM_FILE_HEADER_LENGTH;		// +10 bytes to jump over the file header
 	ptr[0] += VECTORGRAM_BLOCK_HEADER_LENGTH;		// +51 bytes to jump over the channel header
 
+	n_samples = headers[0].samplecount2;
+
 //	fprintf(stderr, "ptr[%d] = 0x%p  (offset %d) \n", 0, ptr[0], (int) (ptr[0]-ptr[0]));
 
-// print the channel names as column headers
-
 	for(i=1; i < channelcount; i++) {
-		ptr[i] = ptr[i-1] + (int) headers[i-1].blocklength + 3;
+		if (n_samples < headers[i].samplecount2)
+			n_samples = headers[i].samplecount2;
+		ptr[i] = ptr[i-1] + headers[i-1].blocklength + 3;
 //		fprintf(stderr, "ptr[%d] = 0x%p  (offset %d) \n", i, ptr[i], (int) (ptr[i]-ptr[i-1]));
 	}
 
+// print the channel names as column headers
+
 	fprintf(fpout, "# ");
-	for(i=0; i < channelcount; i++)
+	for(i=0; i < channelcount; i++) {
+		offset[i] = headers[i].startoffset;
+		if (offset[i] != 0 && headers[i].samplecount1 == headers[i].samplecount2)
+			offset[i]++; // this adjustment is very strange - but needed...
 		fprintf(fpout, "%s\t", headers[i].channelname);
+	}
 	fprintf(fpout,"\n");
 
-	for(j=0;j < (int) headers[0].samplecount1;j++) {
+	for(j=0;j < n_samples;j++) {
 		//fprintf(fpout, "%d", j+1);
+		//fprintf(fpout, "%g\t", time);
 		for(i = 0 ;i < channelcount;i++) {
-			if(j > (int) headers[i].samplecount1)	// no sample available for this timeslot on channel i
-				fprintf(fpout,"\t\t    -");
+			if(j > headers[i].samplecount2)	// no sample available for this timeslot on channel i
+				fprintf(fpout,"    -\t");
 			else {
-				int s = (short)(ptr[i][0] | (ptr[i][1] << 8));
+				int n = offset[i] % headers[i].samplecount2;
+				int s = (short)(ptr[i][n*2] | (ptr[i][n*2+1] << 8));
 				fprintf(fpout, "%5.1f\t",  s * headers[i].vertSensitivity * 0.04);
 			}
-			ptr[i]+=2;
+			offset[i]++;
+			time += headers[0].t_sample;
 		}
 	fprintf(fpout, "\n");
 	}
