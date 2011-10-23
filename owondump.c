@@ -13,11 +13,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
+#include <endian.h>
 #include <usb.h>
-#include <string.h>
-#include <asm/errno.h>
-#include <arpa/inet.h> // for htonl() macro
 #include "owondump.h"
 
 int debug = 0;							  // set to 1 for channel data hex dumps
@@ -71,14 +70,33 @@ int decodeVertSensCode(int sens_code, int probex_code) {
 }
 
 
-uint32_t get_uint32(char *p) {
+uint32_t get_uint32(const void *p) {
 	uint32_t a;
-	memcpy(&a, p,4); // TODO: fix big endian issue
+	memcpy(&a, p,sizeof(a)); // This is needed because of alignment
+	return le32toh(a);
+}
+
+uint16_t get_uint16(const void *p) {
+	uint16_t a;
+	memcpy(&a, p,sizeof(a)); // This is needed because of alignment
+	return le16toh(a);
+}
+
+int16_t get_int16(const void *p) {
+	uint16_t a;
+	memcpy(&a, p,sizeof(a)); // This is needed because of alignment
+	return (int16_t)le16toh(a);
+}
+
+float get_float(const void *p) {
+	float a;
+	memcpy(&a, p,sizeof(a)); // This is needed because of alignment
 	return a;
 }
 
-// decode the contents of the vectorgram data header - providing us with the timebase and voltage values for the channel data
-// hdrBuf has already been stripped of the 10 byte vectorgram file header that begins "SPBV......"
+// decode the contents of the vectorgram data header - providing us with the
+// timebase and voltage values for the channel data hdrBuf has already been
+// stripped of the 10 byte vectorgram file header that begins "SPBV......"
 // returns the size of the channel data block in bytes
 
 struct channelHeader decodeVectorgramBufferHeader(char *hdrBuf) {
@@ -95,11 +113,10 @@ struct channelHeader decodeVectorgramBufferHeader(char *hdrBuf) {
 	header.v_position = (int)get_uint32(hdrBuf+23);
 	header.vertsenscode = get_uint32(hdrBuf+27);
 	header.probexcode = get_uint32(hdrBuf+31);
-
-	memcpy(&header.t_sample, hdrBuf+35,4);
-	memcpy(&header.frequency, hdrBuf+39,4);
-	memcpy(&header.period, hdrBuf+43,4);
-	memcpy(&header.unknown9, hdrBuf+47,4);
+	header.t_sample = get_float(hdrBuf+35);
+	header.frequency = get_float(hdrBuf+39);
+	header.period = get_float(hdrBuf+43);
+	header.unknown9 = get_float(hdrBuf+47);
 
 
 	header.vertSensitivity = decodeVertSensCode(header.vertsenscode, header.probexcode);	// 5mV through 5000mV (5V)
@@ -239,7 +256,7 @@ void writeTextData(const unsigned char *buf, int count) {
 				fprintf(fpout,"    -\t");
 			else {
 				int n = offset[i] % headers[i].samplecount2;
-				int s = (short)(ptr[i][n*2] | (ptr[i][n*2+1] << 8));
+				int s = get_int16(&ptr[i][n*2]);
 				fprintf(fpout, "%5.1f\t",  s * headers[i].vertSensitivity * 0.04);
 			}
 			offset[i]++;
