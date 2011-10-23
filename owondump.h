@@ -29,9 +29,9 @@ struct channelHeader {
 	unsigned vertsenscode;	// 4 bytes (little endian long int holding vertical sensitivity code - 0x00000001 (5mV) to 0x0000000A (5V)
 	unsigned probexcode;	// 4 bytes (probe mult code 0: x1, 1: x10, 2: x100...)
 	float    t_sample;	// 4 bytes time between samples (us)
-	float unknown7;		// 4 bytes (purpose unknown - trigger related?)
-	float unknown8;		// 4 bytes (purpose unknown)
-	float unknown9;		// 4 bytes (purpose unknown)
+	float    frequency;	// 4 bytes frequency of signal (Hz)
+	float    period;	// 4 bytes period of signal (us)
+	float    unknown9;	// 4 bytes (purpose unknown)
 
 // these last three should be in a separate structure since they are not contained in the binary header
 	int vertSensitivity;	// 5mV through 5000mV (5V)

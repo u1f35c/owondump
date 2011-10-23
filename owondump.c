@@ -97,9 +97,9 @@ struct channelHeader decodeVectorgramBufferHeader(char *hdrBuf) {
 	header.probexcode = get_uint32(hdrBuf+31);
 
 	memcpy(&header.t_sample, hdrBuf+35,4);
-	memcpy(&header.unknown7, hdrBuf+39,4);
-	memcpy(&header.unknown8, hdrBuf+43,4);
-	memcpy(&header.unknown9, hdrBuf+43,4);
+	memcpy(&header.frequency, hdrBuf+39,4);
+	memcpy(&header.period, hdrBuf+43,4);
+	memcpy(&header.unknown9, hdrBuf+47,4);
 
 
 	header.vertSensitivity = decodeVertSensCode(header.vertsenscode, header.probexcode);	// 5mV through 5000mV (5V)
@@ -122,10 +122,10 @@ if(debug) {
 	printf("    vert sens code: %08x (%u)\n", header.vertsenscode, header.vertsenscode);
 	printf("   probe mult code: %08x (%u)\n", header.probexcode, header.probexcode);
 	printf("          t_sample: %g us\n", header.t_sample);
-	printf("    	  unknown7: %g\n", header.unknown7);
-    printf("          unknown8: %g\n", header.unknown8);
-    printf("          unknown9: %g\n", header.unknown9);
-    printf("\n");
+	printf("    	 frequency: %g Hz\n", header.frequency);
+	printf("            period: %g us\n", header.period);
+	printf("          unknown9: %g\n", header.unknown9);
+	printf("\n");
 	printf("-------------------------------\n");
 	printf("\n");
 }
