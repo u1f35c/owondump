@@ -149,14 +149,14 @@ struct channelHeader decodeVectorgramBufferHeader(char *hdrBuf) {
 	memcpy(&header.blocklength, hdrBuf+3,4);
 	memcpy(&header.samplecount1, hdrBuf+7,4);
 	memcpy(&header.samplecount2, hdrBuf+11,4);
-	memcpy(&header.unknown3, hdrBuf+15,4);
+	memcpy(&header.startoffset, hdrBuf+15,4);
 	memcpy(&header.timebasecode, hdrBuf+19,4);
-	memcpy(&header.unknown4, hdrBuf+23,4);
+	memcpy(&header.v_position, hdrBuf+23,4);
 	memcpy(&header.vertsenscode, hdrBuf+27,4);
-	memcpy(&header.unknown5, hdrBuf+31,4);
-	memcpy(&header.unknown6, hdrBuf+35,4);
-	memcpy(&header.unknown7, hdrBuf+39,4);
-	memcpy(&header.unknown8, hdrBuf+43,4);
+	memcpy(&header.probexcode, hdrBuf+31,4);
+	memcpy(&header.t_sample, hdrBuf+35,4);
+	memcpy(&header.frequency, hdrBuf+39,4);
+	memcpy(&header.period, hdrBuf+43,4);
 	memcpy(&header.unknown9, hdrBuf+43,4);
 
 	header.vertSensitivity = decodeVertSensCode(header.vertsenscode);	// 5mV through 5000mV (5V)
@@ -167,19 +167,19 @@ struct channelHeader decodeVectorgramBufferHeader(char *hdrBuf) {
 	printf("         sample count: %d\n", (int) header.samplecount1);
 	printf(" vertical sensitivity: %dmV\n", header.vertSensitivity);
 	printf("             timebase: %gms\n", (double) header.timeBase / 1000000);
+	printf("             t_sample: %gus\n", (double) header.t_sample);
 	printf("-------------------------------\n");
 if(debug) {
 	printf(" data block length: %08x (%d) bytes\n", (int) header.blocklength, (int) header.blocklength);
  	printf("      samplecount1: %08x (%d)\n", (int) header.samplecount1, (int) header.samplecount1);
 	printf("      samplecount2: %08x (%d)\n", (int) header.samplecount2, (int) header.samplecount2);
-	printf("          unknown3: %08x (%d)\n", (int) header.unknown3, (int) header.unknown3);
+	printf("      sampleoffset: %08x (%d)\n", (int) header.startoffset, (int) header.startoffset);
 	printf("     timebase code: %08x (%d)\n", (int) header.timebasecode, (int) header.timebasecode);
-	printf("    	  unknown4: %08x (%d)\n", (int) header.unknown4, (int) header.unknown4);
+	printf("        v_position: %08x (%d)\n", (int) header.v_position, (int) header.v_position);
 	printf("    vert sens code: %08x (%d)\n", (int) header.vertsenscode, (int) header.vertsenscode);
-	printf("    	  unknown5: %08x (%d)\n", (int) header.unknown5, (int) header.unknown5);
-	printf("          unknown6: %08x (%d)\n", (int) header.unknown6, (int) header.unknown6);
-	printf("    	  unknown7: %08x (%d)\n", (int) header.unknown7, (int) header.unknown7);
-    printf("          unknown8: %08x (%d)\n", (int) header.unknown8, (int) header.unknown8);
+	printf("   probe mult code: %08x (%d)\n", (int) header.probexcode, (int) header.probexcode);
+	printf("         frequency: %08x (%d Hz)\n", (int) header.frequency, (int) header.frequency);
+	printf("            period: %08x (%d us)\n", (int) header.frequency, (int) header.frequency);
     printf("          unknown9: %08x (%d)\n", (int) header.unknown9, (int) header.unknown9);
     printf("\n");
 	printf("-------------------------------\n");
