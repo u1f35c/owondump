@@ -10,7 +10,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <usb.h>
 #include <string.h>
 #include <asm/errno.h>
 #include <arpa/inet.h> // for htonl() macro
@@ -20,9 +19,6 @@
 #include "owondump.h"
 
 int debug = 0;							  // set to 1 for channel data hex dumps
-
-struct usb_device *usb_locks[MAX_USB_LOCKS];
-int locksFound = 0;
 
 char *filename = "output.bin";			  // default output filename
 int text = 1;							  // tabulated text output as well as raw data output
