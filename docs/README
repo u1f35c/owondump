@@ -52,12 +52,14 @@ Requires
 	gcc
 	GNU make
 	libusb-0.1 - http://libusb.wiki.sourceforge.net/
+	Also, you may need to install libusb:
+	sudo apt-get install libusb-dev
 	
 Compiling
 =========
 
-	gcc -lusb -o owondump owondump.c
-	gcc -lusb -o owonfileread owonfileread.c
+	gcc -o owondump owondump.c -lusb
+	gcc -o owonfileread owonfileread.c -lusb
 		
 Running
 =======
